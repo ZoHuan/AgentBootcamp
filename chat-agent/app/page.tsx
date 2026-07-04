@@ -1,14 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-};
+import { Message } from "@/lib/types";
 
 const STORAGE_KEY = "ai-chat-messages";
 
@@ -35,7 +31,6 @@ export default function Home() {
     } catch {}
   }, [messages]);
 
-  // 新消息自动滚到底部
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -66,7 +61,6 @@ export default function Home() {
         return;
       }
 
-      // 先占位一条空的 AI 消息，流式往里填内容
       const aiMessage: Message = { role: "assistant", content: "" };
       setMessages((prev) => [...prev, aiMessage]);
 

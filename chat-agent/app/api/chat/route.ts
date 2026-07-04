@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { SYSTEM_PROMPT } from "@/lib/prompts";
 
 const client = new OpenAI({
   apiKey: process.env.MIMO_API_KEY,
@@ -8,9 +9,14 @@ const client = new OpenAI({
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
+  const formattedMessages = [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+    ...messages,
+  ];
+
   const response = await client.chat.completions.create({
     model: "mimo-v2.5",
-    messages,
+    messages: formattedMessages,
     stream: true,
   });
 
