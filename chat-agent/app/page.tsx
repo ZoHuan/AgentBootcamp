@@ -19,10 +19,15 @@ function loadMessages(): Message[] {
 }
 
 export default function Home() {
-  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const saved = loadMessages();
+    if (saved.length > 0) setMessages(saved);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -140,6 +145,14 @@ export default function Home() {
           </div>
         ))}
         <div ref={bottomRef} />
+
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-zinc-100 text-zinc-500 rounded-lg px-4 py-2 text-sm animate-pulse">
+              AI 正在思考...
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 输入框 */}
