@@ -11,7 +11,9 @@ function loadMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Message[];
+    return parsed.map((m) => (m.id ? m : { ...m, id: crypto.randomUUID() }));
   } catch {
     return [];
   }
