@@ -27,6 +27,19 @@ Provide a practical code example.
 List 1-2 common mistakes and how to avoid them.
 `;
 
+export const STRUCTURED_OUTPUT_PROMPT = `
+You must respond with ONLY valid JSON. No markdown, no explanation outside the JSON.
+
+Use this exact format:
+{
+  "title": "一句话标题",
+  "summary": "2-3句话总结",
+  "examples": ["示例1", "示例2"]
+}
+
+Return ONLY the JSON object. No backticks, no markdown, nothing else.
+`;
+
 interface BuildPromptInput {
   role: string;
   task: string;

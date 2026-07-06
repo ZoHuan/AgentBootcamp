@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import { CURRENT_ROLE, ROLE_PROMPT, TASK_PROMPT, FORMAT_PROMPT, buildPrompt } from "@/lib/prompts";
+import { CURRENT_ROLE, ROLE_PROMPT, TASK_PROMPT, STRUCTURED_OUTPUT_PROMPT, buildPrompt } from "@/lib/prompts";
+import { parseResponse } from "@/lib/parser/parseResponse";
 
 const client = new OpenAI({
   apiKey: process.env.MIMO_API_KEY,
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
 
   const systemPrompt = buildPrompt({
     role: CURRENT_ROLE,
-    task: [ROLE_PROMPT, TASK_PROMPT, FORMAT_PROMPT].join("\n"),
+    task: [ROLE_PROMPT, TASK_PROMPT, STRUCTURED_OUTPUT_PROMPT].join("\n"),
   });
 
   const formattedMessages = [
@@ -27,10 +28,17 @@ export async function POST(req: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let fullText = "";
+
       for await (const chunk of response) {
         const content = chunk.choices[0]?.delta?.content || "";
+        fullText += content;
         controller.enqueue(new TextEncoder().encode(content));
       }
+
+      const parsed = parseResponse(fullText);
+      console.log("[chat] 解析结果:", parsed);
+
       controller.close();
     },
   });
