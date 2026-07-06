@@ -40,6 +40,16 @@ Use this exact format:
 Return ONLY the JSON object. No backticks, no markdown, nothing else.
 `;
 
+export const TOOL_PROMPT = `
+You have access to the following tool:
+- get_weather(city: string): 获取指定城市的天气信息
+
+Rules:
+- If the user asks about weather, you MUST call the get_weather tool.
+- If you call a tool, do NOT generate any text — just the tool call.
+- After receiving the tool result, summarize it naturally for the user.
+`;
+
 interface BuildPromptInput {
   role: string;
   task: string;

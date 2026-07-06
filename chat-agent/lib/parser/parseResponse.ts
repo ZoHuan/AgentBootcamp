@@ -18,10 +18,8 @@ export function parseResponse(raw: string): Answer | null {
       return parsed as Answer;
     }
 
-    console.warn("[parseResponse] JSON 格式不匹配 Answer schema:", parsed);
     return null;
-  } catch (err) {
-    console.warn("[parseResponse] JSON 解析失败:", err instanceof Error ? err.message : err);
+  } catch {
     return null;
   }
 }
