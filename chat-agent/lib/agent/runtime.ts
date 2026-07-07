@@ -1,19 +1,19 @@
 import OpenAI from "openai";
-import { getToolDefinitions, executeTool } from "@/lib/tools/runner";
 import { MemoryManager } from "@/lib/memory/memory";
-
-const client = new OpenAI({
-  apiKey: process.env.MIMO_API_KEY,
-  baseURL: "https://token-plan-cn.xiaomimimo.com/v1",
-});
+import { Planner } from "./planner";
+import { Executor } from "./executor";
 
 export class AgentRuntime {
   private systemPrompt: string;
   private memory: MemoryManager;
+  private planner: Planner;
+  private executor: Executor;
 
   constructor(systemPrompt: string) {
     this.systemPrompt = systemPrompt;
     this.memory = new MemoryManager(10);
+    this.planner = new Planner();
+    this.executor = new Executor();
   }
 
   async run(userMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]) {
@@ -32,73 +32,12 @@ export class AgentRuntime {
       this.memory.save("user", lastUserMsg.content as string);
     }
 
-    const toolCalls = await this.plan(conversation);
+    this.planner.createPlan((lastUserMsg?.content as string) || "");
 
-    if (toolCalls) {
-      this.execute(conversation, toolCalls);
-    }
+    await this.executor.askLLM(conversation);
 
-    return this.respond(conversation);
-  }
-
-  private async plan(
-    conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
-  ) {
-    const response = await client.chat.completions.create({
-      model: "mimo-v2.5",
-      messages: conversation,
-      tools: getToolDefinitions(),
-    });
-
-    const choice = response.choices[0];
-    conversation.push(choice.message);
-    return choice.message.tool_calls ?? null;
-  }
-
-  private execute(
-    conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-    toolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[]
-  ) {
-    for (const tc of toolCalls) {
-      if (tc.type !== "function") continue;
-
-      const args = JSON.parse(tc.function.arguments);
-      const result = executeTool(tc.function.name, args);
-      if (!result) continue;
-
-      conversation.push({
-        role: "tool",
-        tool_call_id: tc.id,
-        content: result,
-      });
-    }
-  }
-
-  private respond(
-    conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
-  ) {
-    const memory = this.memory;
-
-    return new ReadableStream({
-      async start(controller) {
-        const response = await client.chat.completions.create({
-          model: "mimo-v2.5",
-          messages: conversation,
-          stream: true,
-        });
-
-        let fullContent = "";
-
-        for await (const chunk of response) {
-          const content = chunk.choices[0]?.delta?.content || "";
-          fullContent += content;
-          controller.enqueue(new TextEncoder().encode(content));
-        }
-
-        memory.save("assistant", fullContent);
-
-        controller.close();
-      },
+    return this.executor.respond(conversation, (fullContent) => {
+      this.memory.save("assistant", fullContent);
     });
   }
 }
