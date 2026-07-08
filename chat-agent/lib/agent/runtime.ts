@@ -2,18 +2,21 @@ import OpenAI from "openai";
 import { MemoryManager } from "@/lib/memory/memory";
 import { Planner } from "./planner";
 import { Executor } from "./executor";
+import { Reflector } from "./reflector";
 
 export class AgentRuntime {
   private systemPrompt: string;
   private memory: MemoryManager;
   private planner: Planner;
   private executor: Executor;
+  private reflector: Reflector;
 
   constructor(systemPrompt: string) {
     this.systemPrompt = systemPrompt;
     this.memory = new MemoryManager(10);
     this.planner = new Planner();
     this.executor = new Executor();
+    this.reflector = new Reflector();
   }
 
   async run(userMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]) {
@@ -34,10 +37,53 @@ export class AgentRuntime {
 
     this.planner.createPlan((lastUserMsg?.content as string) || "");
 
-    await this.executor.askLLM(conversation);
+    let retries = 0;
+    const maxRetries = 2;
 
-    return this.executor.respond(conversation, (fullContent) => {
-      this.memory.save("assistant", fullContent);
-    });
+    while (true) {
+      await this.executor.askLLM(conversation);
+
+      let fullText = "";
+
+      const stream = this.executor.respond(conversation, (text) => {
+        fullText = text;
+      });
+
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      const chunks: string[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(decoder.decode(value, { stream: true }));
+      }
+
+      const evaluation = this.reflector.evaluate(fullText);
+
+      console.log("======== REFLECTION ========");
+      console.log(`Success: ${evaluation.success}`);
+      console.log(`Confidence: ${evaluation.confidence}`);
+      console.log(`Reason: ${evaluation.reason}`);
+      console.log(`Retry: ${evaluation.retry}`);
+      console.log(`Retries: ${retries}/${maxRetries}`);
+      console.log("============================");
+
+      if (!evaluation.retry || retries >= maxRetries) {
+        this.memory.save("assistant", fullText);
+
+        return new ReadableStream({
+          start(controller) {
+            const encoder = new TextEncoder();
+            for (const chunk of chunks) {
+              controller.enqueue(encoder.encode(chunk));
+            }
+            controller.close();
+          },
+        });
+      }
+
+      retries++;
+    }
   }
 }
