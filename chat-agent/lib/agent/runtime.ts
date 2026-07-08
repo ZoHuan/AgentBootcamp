@@ -3,6 +3,8 @@ import { MemoryManager } from "@/lib/memory/memory";
 import { Planner } from "./planner";
 import { Executor } from "./executor";
 import { Reflector } from "./reflector";
+import { nextStep } from "./plan";
+import { PlanStep } from "./types";
 
 export class AgentRuntime {
   private systemPrompt: string;
@@ -35,55 +37,81 @@ export class AgentRuntime {
       this.memory.save("user", lastUserMsg.content as string);
     }
 
-    this.planner.createPlan((lastUserMsg?.content as string) || "");
+    const plan = this.planner.createPlan(
+      (lastUserMsg?.content as string) || ""
+    );
 
-    let retries = 0;
-    const maxRetries = 2;
+    console.log("========== PLAN ==========");
+    console.log(`Goal: ${plan.goal}`);
+    plan.steps.forEach((s: PlanStep, i: number) => {
+      const marker = s.status === "running"   ? "→" :
+                     s.status === "completed" ? "✓" :
+                     s.status === "failed"    ? "✗" : " ";
+      console.log(`[${marker}] ${s.title}: ${s.description}`);
+    });
+    console.log("===========================");
 
-    while (true) {
-      await this.executor.askLLM(conversation);
+    let step = nextStep(plan);
 
-      let fullText = "";
+    while (step) {
+      step.status = "running";
 
-      const stream = this.executor.respond(conversation, (text) => {
-        fullText = text;
-      });
-
-      const reader = stream.getReader();
-      const decoder = new TextDecoder();
-      const chunks: string[] = [];
+      let retries = 0;
+      const maxRetries = 2;
 
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(decoder.decode(value, { stream: true }));
-      }
+        await this.executor.askLLM(conversation);
 
-      const evaluation = this.reflector.evaluate(fullText);
+        let fullText = "";
 
-      console.log("======== REFLECTION ========");
-      console.log(`Success: ${evaluation.success}`);
-      console.log(`Confidence: ${evaluation.confidence}`);
-      console.log(`Reason: ${evaluation.reason}`);
-      console.log(`Retry: ${evaluation.retry}`);
-      console.log(`Retries: ${retries}/${maxRetries}`);
-      console.log("============================");
-
-      if (!evaluation.retry || retries >= maxRetries) {
-        this.memory.save("assistant", fullText);
-
-        return new ReadableStream({
-          start(controller) {
-            const encoder = new TextEncoder();
-            for (const chunk of chunks) {
-              controller.enqueue(encoder.encode(chunk));
-            }
-            controller.close();
-          },
+        const stream = this.executor.respond(conversation, (text) => {
+          fullText = text;
         });
-      }
 
-      retries++;
+        const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        const chunks: string[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(decoder.decode(value, { stream: true }));
+        }
+
+        const evaluation = this.reflector.evaluate(fullText);
+
+        if (!evaluation.retry || retries >= maxRetries) {
+          step.status = evaluation.success ? "completed" : "failed";
+          console.log(
+            `[${step.status === "completed" ? "✓" : "✗"}] ${step.title} — ${evaluation.reason}`
+          );
+          this.memory.save("assistant", fullText);
+
+          step = nextStep(plan);
+
+          if (!step) {
+            return new ReadableStream({
+              start(controller) {
+                const encoder = new TextEncoder();
+                for (const chunk of chunks) {
+                  controller.enqueue(encoder.encode(chunk));
+                }
+                controller.close();
+              },
+            });
+          }
+          break;
+        }
+
+        retries++;
+      }
     }
+
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(""));
+        controller.close();
+      },
+    });
   }
 }

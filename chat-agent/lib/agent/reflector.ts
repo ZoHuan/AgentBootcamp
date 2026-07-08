@@ -1,9 +1,4 @@
-export interface Evaluation {
-  success: boolean;
-  confidence: number;
-  reason: string;
-  retry: boolean;
-}
+import { Evaluation } from "./types";
 
 export class Reflector {
   evaluate(responseText: string): Evaluation {
