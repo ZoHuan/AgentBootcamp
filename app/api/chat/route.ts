@@ -1,5 +1,5 @@
 import { CURRENT_ROLE, ROLE_PROMPT, TASK_PROMPT, TOOL_PROMPT, buildPrompt } from "@/lib/prompts";
-import { AgentRuntime } from "@/lib/agent/runtime";
+import { AgentRuntime } from "@/lib/runtime/runtime";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
