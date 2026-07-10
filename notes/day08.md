@@ -1,38 +1,28 @@
-# Day 8 — Agent 核心：ReAct（Reason + Act）
+# Day 8 — Agent Runtime：ReAct（Reason + Act）
 
-## 核心概念
+## 今天学到的
 
-### 什么是 ReAct？
-**Re**ason + **Act** = 先思考再行动。Agent 不直接回答问题，而是先判断"需要调什么工具"，执行后再总结。
-
-### 为什么 Agent 要「Thought」？
-因为 LLM 需要停下来「决策」——用户问天气，是直接编一个答案？还是调 get_weather 工具？`plan()` 这一步就是给 LLM 决策的机会。
-
-### Runtime vs Tool Runner？
-| | AgentRuntime | Tool Runner |
-|---|---|---|
-| 职责 | 编排流程 | 管理工具 |
-| 方法 | plan / execute / respond | getDefinitions / executeTool |
-| 依赖 LLM？ | 是 | 否 |
+- **ReAct** = Reason + Act：Agent 先思考"需要调什么工具"，再执行，最后总结
+- **为什么 Agent 要 Thought**：LLM 需要停下来决策——直接编答案还是调工具？`plan()` 就是决策点
+- **Runtime vs Tool Runner**：Runtime 编排流程（依赖 LLM），Runner 管理工具（不依赖 LLM）
 
 ## 完成内容
 
-### AgentRuntime（lib/agent/runtime.ts）
-- `plan()` — 调 LLM + tools，获取 tool_calls
-- `execute()` — 根据 tool_calls 执行函数
-- `respond()` — 流式返回最终答案
-
-### 工具体系重构
+- `lib/agent/runtime.ts` — AgentRuntime（plan → execute → respond）
 - `lib/tools/registry.ts` — 工具注册中心
-- `lib/tools/runner.ts` — 工具执行器（走注册中心）
-- `lib/tools/getWeather.ts` — 纯函数
+- `lib/tools/runner.ts` — 工具执行器
+- route.ts 瘦身到 15 行，全委托给 AgentRuntime
 
-### 目录结构成型
+## 架构
+
 ```
-lib/
-├── agent/runtime.ts
-├── tools/{registry,runner,getWeather}.ts
-├── prompts/index.ts
-├── parser/
-└── schemas/
+route.ts → AgentRuntime
+            ├── plan()     → 调 LLM + tools
+            ├── execute()  → 执行工具
+            └── respond()  → 流式返回
 ```
+
+## 收获
+
+- 职责分离：Runtime 做调度，不再直接调 LLM
+- AGent 核心公式落地：`Agent = LLM + Tools + Loop`

@@ -6,6 +6,8 @@ import { Reflector } from "./reflector";
 import { nextStep } from "./plan";
 import { PlanStep } from "./types";
 
+import { createToolRegistry } from "@/lib/tools";
+
 export class AgentRuntime {
   private systemPrompt: string;
   private memory: MemoryManager;
@@ -17,7 +19,7 @@ export class AgentRuntime {
     this.systemPrompt = systemPrompt;
     this.memory = new MemoryManager(10);
     this.planner = new Planner();
-    this.executor = new Executor();
+    this.executor = new Executor(createToolRegistry());
     this.reflector = new Reflector();
   }
 
@@ -60,7 +62,10 @@ export class AgentRuntime {
       const maxRetries = 2;
 
       while (true) {
-        await this.executor.askLLM(conversation);
+        await this.executor.askLLM(
+          conversation,
+          (lastUserMsg?.content as string) || ""
+        );
 
         let fullText = "";
 

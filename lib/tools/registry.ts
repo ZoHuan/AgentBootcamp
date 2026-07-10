@@ -1,34 +1,21 @@
-interface ToolDefinition {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: "object";
-      properties: Record<string, { type: string; description: string }>;
-      required: string[];
-    };
-  };
-}
+import { Tool } from "./tool";
 
-interface Tool {
-  definition: ToolDefinition;
-  execute: (args: Record<string, unknown>) => string;
-}
+export class ToolRegistry {
+  private tools = new Map<string, Tool>();
 
-const toolMap = new Map<string, Tool>();
+  register(tool: Tool): void {
+    this.tools.set(tool.id, tool);
+  }
 
-export function registerTool(
-  definition: ToolDefinition,
-  execute: (args: Record<string, unknown>) => string
-) {
-  toolMap.set(definition.function.name, { definition, execute });
-}
+  get(id: string): Tool | undefined {
+    return this.tools.get(id);
+  }
 
-export function getAllDefinitions(): ToolDefinition[] {
-  return Array.from(toolMap.values()).map((t) => t.definition);
-}
+  getAll(): Tool[] {
+    return Array.from(this.tools.values());
+  }
 
-export function getTool(name: string): Tool | undefined {
-  return toolMap.get(name);
+  remove(id: string): void {
+    this.tools.delete(id);
+  }
 }

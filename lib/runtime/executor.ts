@@ -1,5 +1,7 @@
 import OpenAI from "openai";
-import { getToolDefinitions, executeTool } from "@/lib/tools/runner";
+import { ToolRegistry } from "@/lib/tools/registry";
+import { ToolSelector } from "@/lib/tools/selector";
+import { Tool } from "@/lib/tools/tool";
 
 const client = new OpenAI({
   apiKey: process.env.MIMO_API_KEY,
@@ -7,13 +9,44 @@ const client = new OpenAI({
 });
 
 export class Executor {
+  private registry: ToolRegistry;
+  private selector: ToolSelector;
+
+  constructor(registry: ToolRegistry) {
+    this.registry = registry;
+    this.selector = new ToolSelector(registry);
+  }
+
+  private toOpenAITool(t: Tool) {
+    return {
+      type: "function" as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: { type: "object" as const, properties: {} },
+      },
+    };
+  }
+
+  private buildToolList(userInput?: string) {
+    if (userInput) {
+      const selected = this.selector.select(userInput);
+      if (selected) return [this.toOpenAITool(selected)];
+    }
+
+    return this.registry.getAll().map((t) => this.toOpenAITool(t));
+  }
+
   async askLLM(
-    conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+    conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+    userInput?: string
   ) {
+    const tools = this.buildToolList(userInput);
+
     const response = await client.chat.completions.create({
       model: "mimo-v2.5",
       messages: conversation,
-      tools: getToolDefinitions(),
+      tools,
     });
 
     const choice = response.choices[0];
@@ -25,14 +58,16 @@ export class Executor {
       for (const tc of toolCalls) {
         if (tc.type !== "function") continue;
 
+        const tool = this.registry.get(tc.function.name);
+        if (!tool) continue;
+
         const args = JSON.parse(tc.function.arguments);
-        const result = executeTool(tc.function.name, args);
-        if (!result) continue;
+        const result = await tool.execute(args);
 
         conversation.push({
           role: "tool",
           tool_call_id: tc.id,
-          content: result,
+          content: typeof result === "string" ? result : JSON.stringify(result),
         });
       }
     }

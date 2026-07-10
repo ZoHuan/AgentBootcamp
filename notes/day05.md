@@ -2,39 +2,23 @@
 
 ## 今天学到的
 
-### 1. Prompt 分层架构
+- Prompt 分层：SYSTEM_PROMPT（身份）→ ROLE_PROMPT（规则）→ TASK_PROMPT（指令）→ FORMAT_PROMPT（输出格式）
+- `buildPrompt()` 是 Prompt 组合工厂——以后 RAG、Memory、Tool Calling 都走这里
+- Prompt 不是一句话，是「程序」——改变 Prompt 就改变 AI 行为
+
+## 完成内容
+
+- `lib/prompts.ts` 拆分为四层，引入 `buildPrompt({ role, task, context })`
+- `FORMAT_PROMPT` 控制 AI 按「概念 → 原理 → 示例 → 错误」四段输出
+- 三个角色实验：普通助手 / Google Staff Engineer / 耐心导师，同一问题回答差异显著
+
+## 架构
 
 ```
-SYSTEM_PROMPT  → 你是谁（身份）
-ROLE_PROMPT    → 你遵守什么规则（行为规范）
-TASK_PROMPT    → 当前要做什么（任务指令）
-FORMAT_PROMPT  → 输出格式控制（结构化模版）
+buildPrompt({ role, task, context }) → 拼接 → system message → LLM
 ```
 
-### 2. buildPrompt() — Prompt 组合工厂
+## 收获
 
-```ts
-buildPrompt({ role, task, context })
-```
-
-职责：把多个 prompt 片段拼成一条 system message。以后 RAG、Memory、Tool Calling 都走这里。
-
-### 3. 输出格式控制
-
-通过 `FORMAT_PROMPT` 告诉 AI 按「概念 → 原理 → 示例 → 常见错误」四段输出，实现了用自然语言控制输出结构。
-
-## Prompt 实验
-
-同一个问题「什么是闭包？」，三个不同角色设定：
-
-| 实验 | 角色 | 结果 |
-|---|---|---|
-| R_A | 普通助手 | 回答全面、平衡 |
-| R_B | Google Staff Engineer | 更专业、深入底层原理 |
-| R_C | 耐心导师 | 通俗易懂、教学比喻 |
-
-## 我的理解
-
-Prompt 不是一句话，是「程序」。改变 Prompt 就改变了 AI 的行为模式，就像改变函数参数改变程序行为一样。
-
-Prompt Engineering 的本质：**用自然语言编程，控制 AI 的输出风格、深度和格式。**
+- Prompt Engineering 本质：用自然语言编程，控制 AI 的输出风格、深度和格式
+- 分层后每个 Prompt 独立修改，互不影响

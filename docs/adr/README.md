@@ -7,3 +7,5 @@
 - [ADR-0005](ADR-0005-multi-step-planning.md) — Multi-Step Planning
 - [ADR-0006](ADR-0006-workflow-engine.md) — Workflow Engine
 - [ADR-0007](ADR-0007-state-machine-checkpoint.md) — State Machine + Checkpoint
+- [ADR-0008](ADR-0008-project-structure.md) — 项目结构重组
+- [ADR-0009](ADR-0009-tool-registry.md) — Tool Registry

@@ -1,8 +1,10 @@
 # Day 1 — LLM + AI 应用入门
 
-## 目标
+## 今天学到的
 
-做一个最小可用 AI Chat 应用（Mini ChatGPT）。
+- 做一个最小可用 AI Chat 应用——前端调 API、流式返回、显示聊天记录
+- LLM API 调用全流程：User Input → Frontend → API Route → LLM → Stream → UI
+- OpenAI 兼容接口的选择：国内网络限制下的替代方案（MiMo）
 
 ## 完成内容
 
@@ -17,15 +19,11 @@
 User Input → Frontend (Next.js) → API Route → LLM (MiMo) → Stream → UI 渲染
 ```
 
-## 技术收获
+## 收获
 
 - OpenAI SDK 的 `stream: true` + `ReadableStream` 实现流式输出
 - SSE 在 Next.js API Route 中的处理
 - `useState` + `useEffect` 管理聊天状态和自动滚动
-- `localStorage` 持久化聊天记录
-
-## 遇到的问题
-
 - OpenAI API 国内无法直连 → 换成小米 MiMo（OpenAI 兼容接口）
 - Gemini 镜像不稳定 → 放弃
 - `.env.local` 修改后需重启 dev server 才能生效
