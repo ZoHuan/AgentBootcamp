@@ -1,24 +1,24 @@
 import OpenAI from "openai";
 import { MemoryManager } from "@/lib/memory/memory";
-import { Planner } from "./planner";
+import { LLMPlanner } from "@/lib/planning/planner";
 import { Executor } from "./executor";
 import { Reflector } from "./reflector";
 import { nextStep } from "./plan";
-import { PlanStep } from "./types";
+import { PlanStep } from "@/lib/planning/plan";
 
 import { createToolRegistry } from "@/lib/tools";
 
 export class AgentRuntime {
   private systemPrompt: string;
   private memory: MemoryManager;
-  private planner: Planner;
+  private planner: LLMPlanner;
   private executor: Executor;
   private reflector: Reflector;
 
   constructor(systemPrompt: string) {
     this.systemPrompt = systemPrompt;
     this.memory = new MemoryManager(10);
-    this.planner = new Planner();
+    this.planner = new LLMPlanner();
     this.executor = new Executor(createToolRegistry());
     this.reflector = new Reflector();
   }
@@ -39,7 +39,7 @@ export class AgentRuntime {
       this.memory.save("user", lastUserMsg.content as string);
     }
 
-    const plan = this.planner.createPlan(
+    const plan = await this.planner.createPlan(
       (lastUserMsg?.content as string) || ""
     );
 
@@ -49,7 +49,7 @@ export class AgentRuntime {
       const marker = s.status === "running"   ? "→" :
                      s.status === "completed" ? "✓" :
                      s.status === "failed"    ? "✗" : " ";
-      console.log(`[${marker}] ${s.title}: ${s.description}`);
+      console.log(`[${marker}] ${s.description}`);
     });
     console.log("===========================");
 
@@ -88,7 +88,7 @@ export class AgentRuntime {
         if (!evaluation.retry || retries >= maxRetries) {
           step.status = evaluation.success ? "completed" : "failed";
           console.log(
-            `[${step.status === "completed" ? "✓" : "✗"}] ${step.title} — ${evaluation.reason}`
+            `[${step.status === "completed" ? "✓" : "✗"}] ${step.description} — ${evaluation.reason}`
           );
           this.memory.save("assistant", fullText);
 
