@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { ToolRegistry } from "@/lib/tools/registry";
-import { ToolSelector } from "@/lib/tools/selector";
+import { KeywordRouter } from "@/lib/tools/router";
 import { Tool } from "@/lib/tools/tool";
 
 const client = new OpenAI({
@@ -10,11 +10,11 @@ const client = new OpenAI({
 
 export class Executor {
   private registry: ToolRegistry;
-  private selector: ToolSelector;
+  private router: KeywordRouter;
 
   constructor(registry: ToolRegistry) {
     this.registry = registry;
-    this.selector = new ToolSelector(registry);
+    this.router = new KeywordRouter(registry);
   }
 
   private toOpenAITool(t: Tool) {
@@ -30,8 +30,10 @@ export class Executor {
 
   private buildToolList(userInput?: string) {
     if (userInput) {
-      const selected = this.selector.select(userInput);
-      if (selected) return [this.toOpenAITool(selected)];
+      const candidates = this.router.route(userInput);
+      if (candidates.length > 0) {
+        return candidates.map((c) => this.toOpenAITool(c.tool));
+      }
     }
 
     return this.registry.getAll().map((t) => this.toOpenAITool(t));

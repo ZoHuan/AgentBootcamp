@@ -8,6 +8,9 @@ export function createToolRegistry(): ToolRegistry {
     id: "get_weather",
     name: "get_weather",
     description: "获取指定城市的天气信息",
+    tags: ["weather", "forecast", "temperature"],
+    category: "weather",
+    priority: 1,
     execute: async (input) => getWeather(input as { city: string }),
   });
 

@@ -9,3 +9,4 @@
 - [ADR-0007](ADR-0007-state-machine-checkpoint.md) — State Machine + Checkpoint
 - [ADR-0008](ADR-0008-project-structure.md) — 项目结构重组
 - [ADR-0009](ADR-0009-tool-registry.md) — Tool Registry
+- [ADR-0010](ADR-0010-tool-router.md) — Tool Router
