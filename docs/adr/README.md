@@ -12,3 +12,4 @@
 - [ADR-0010](ADR-0010-tool-router.md) — Tool Router
 - [ADR-0011](ADR-0011-llm-planning.md) — LLM Planning
 - [ADR-0012](ADR-0012-agent-evaluation.md) — Agent Evaluation
+- [ADR-0013](ADR-0013-retry-policy.md) — Retry Policy
