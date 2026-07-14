@@ -13,3 +13,4 @@
 - [ADR-0011](ADR-0011-llm-planning.md) — LLM Planning
 - [ADR-0012](ADR-0012-agent-evaluation.md) — Agent Evaluation
 - [ADR-0013](ADR-0013-retry-policy.md) — Retry Policy
+- [ADR-0014](ADR-0014-human-in-the-loop.md) — Human-in-the-Loop

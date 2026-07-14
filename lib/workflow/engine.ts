@@ -2,18 +2,22 @@ import { WorkflowState } from "./state";
 import { WorkflowNode } from "./node";
 import { StateMachine } from "@/lib/state/machine";
 import { CheckpointManager } from "@/lib/state/checkpoint";
+import { ApprovalManager } from "@/lib/approval/approval-manager";
+import { RiskLevel } from "@/lib/approval/approval";
 
 export class WorkflowEngine {
   private nodeMap: Map<string, WorkflowNode>;
   private state: WorkflowState;
   private sm: StateMachine;
   private checkpoint: CheckpointManager;
+  private approval: ApprovalManager;
 
   constructor(nodes: WorkflowNode[]) {
     this.nodeMap = new Map(nodes.map((n) => [n.id, n]));
     this.state = { currentStep: "", status: "running", data: {} };
     this.sm = new StateMachine();
     this.checkpoint = new CheckpointManager();
+    this.approval = new ApprovalManager();
   }
 
   async start(): Promise<WorkflowState> {
@@ -37,6 +41,23 @@ export class WorkflowEngine {
     let currentNode: WorkflowNode | null = firstNode;
 
     while (currentNode) {
+      if (currentNode.needsApproval && this.approval.needsApproval(currentNode.riskLevel ?? RiskLevel.LOW)) {
+        const req = this.approval.requestApproval(
+          currentNode.name,
+          `需要审批: ${currentNode.name}`,
+          currentNode.riskLevel ?? RiskLevel.LOW
+        );
+
+        this.checkpoint.save(this.sm.getState(), currentNode.id, this.state.data);
+        this.state.status = "awaiting_approval";
+
+        console.log(
+          `[Approval] 等待审批: ${currentNode.name} (${req.riskLevel}), ID: ${req.id}`
+        );
+
+        return this.state;
+      }
+
       this.sm.transition("PLAN_CREATED");
       this.state.currentStep = currentNode.id;
 
