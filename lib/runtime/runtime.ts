@@ -7,6 +7,7 @@ import { nextStep } from "./plan";
 import { PlanStep } from "@/lib/planning/plan";
 
 import { createToolRegistry } from "@/lib/tools";
+import { Tracer } from "@/lib/observability/tracer";
 
 export class AgentRuntime {
   private systemPrompt: string;
@@ -14,6 +15,7 @@ export class AgentRuntime {
   private planner: LLMPlanner;
   private executor: Executor;
   private reflector: Reflector;
+  private tracer: Tracer;
 
   constructor(systemPrompt: string) {
     this.systemPrompt = systemPrompt;
@@ -21,9 +23,12 @@ export class AgentRuntime {
     this.planner = new LLMPlanner();
     this.executor = new Executor(createToolRegistry());
     this.reflector = new Reflector();
+    this.tracer = new Tracer();
   }
 
-  async run(userMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]) {
+  async run(
+    userMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  ) {
     const history = this.memory.formatHistory();
     const promptWithHistory = history
       ? `${this.systemPrompt}\n\n对话历史:\n${history}`
@@ -39,16 +44,25 @@ export class AgentRuntime {
       this.memory.save("user", lastUserMsg.content as string);
     }
 
+    this.tracer.startTrace("agent-run");
+
+    const plannerSpan = this.tracer.startSpan("planner");
     const plan = await this.planner.createPlan(
-      (lastUserMsg?.content as string) || ""
+      (lastUserMsg?.content as string) || "",
     );
+    this.tracer.endSpan(plannerSpan, true);
 
     console.log("========== PLAN ==========");
     console.log(`Goal: ${plan.goal}`);
     plan.steps.forEach((s: PlanStep, i: number) => {
-      const marker = s.status === "running"   ? "→" :
-                     s.status === "completed" ? "✓" :
-                     s.status === "failed"    ? "✗" : " ";
+      const marker =
+        s.status === "running"
+          ? "→"
+          : s.status === "completed"
+            ? "✓"
+            : s.status === "failed"
+              ? "✗"
+              : " ";
       console.log(`[${marker}] ${s.description}`);
     });
     console.log("===========================");
@@ -62,9 +76,10 @@ export class AgentRuntime {
       const maxRetries = 2;
 
       while (true) {
+        const execSpan = this.tracer.startSpan("executor");
         await this.executor.askLLM(
           conversation,
-          (lastUserMsg?.content as string) || ""
+          (lastUserMsg?.content as string) || "",
         );
 
         let fullText = "";
@@ -84,17 +99,22 @@ export class AgentRuntime {
         }
 
         const evaluation = this.reflector.evaluate(fullText);
+        this.tracer.endSpan(execSpan, evaluation.success);
 
         if (!evaluation.retry || retries >= maxRetries) {
           step.status = evaluation.success ? "completed" : "failed";
           console.log(
-            `[${step.status === "completed" ? "✓" : "✗"}] ${step.description} — ${evaluation.reason}`
+            `[${step.status === "completed" ? "✓" : "✗"}] ${step.description} — ${evaluation.reason}`,
           );
           this.memory.save("assistant", fullText);
 
           step = nextStep(plan);
 
           if (!step) {
+            const answerSpan = this.tracer.startSpan("answer");
+            this.tracer.endSpan(answerSpan, true);
+            this.tracer.endTrace();
+
             return new ReadableStream({
               start(controller) {
                 const encoder = new TextEncoder();

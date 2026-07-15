@@ -14,3 +14,4 @@
 - [ADR-0012](ADR-0012-agent-evaluation.md) — Agent Evaluation
 - [ADR-0013](ADR-0013-retry-policy.md) — Retry Policy
 - [ADR-0014](ADR-0014-human-in-the-loop.md) — Human-in-the-Loop
+- [ADR-0015](ADR-0015-observability.md) — Observability
