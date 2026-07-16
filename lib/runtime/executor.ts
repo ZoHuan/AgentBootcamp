@@ -2,6 +2,8 @@ import OpenAI from "openai";
 import { ToolRegistry } from "@/lib/tools/registry";
 import { KeywordRouter } from "@/lib/tools/router";
 import { Tool } from "@/lib/tools/tool";
+import { ToolGuardrail } from "@/lib/guardrails/tool-guard";
+import { RiskLevel } from "@/lib/approval/approval";
 
 const client = new OpenAI({
   apiKey: process.env.MIMO_API_KEY,
@@ -11,10 +13,12 @@ const client = new OpenAI({
 export class Executor {
   private registry: ToolRegistry;
   private router: KeywordRouter;
+  private toolGuard: ToolGuardrail;
 
   constructor(registry: ToolRegistry) {
     this.registry = registry;
     this.router = new KeywordRouter(registry);
+    this.toolGuard = new ToolGuardrail();
   }
 
   private toOpenAITool(t: Tool) {
@@ -62,6 +66,19 @@ export class Executor {
 
         const tool = this.registry.get(tc.function.name);
         if (!tool) continue;
+
+        const guardCheck = await this.toolGuard.check({
+          name: tc.function.name,
+          riskLevel: RiskLevel.LOW,
+        });
+        if (!guardCheck.passed) {
+          conversation.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            content: JSON.stringify({ error: guardCheck.reason }),
+          });
+          continue;
+        }
 
         const args = JSON.parse(tc.function.arguments);
         const result = await tool.execute(args);

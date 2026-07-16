@@ -8,6 +8,8 @@ import { PlanStep } from "@/lib/planning/plan";
 
 import { createToolRegistry } from "@/lib/tools";
 import { Tracer } from "@/lib/observability/tracer";
+import { InputGuardrail } from "@/lib/guardrails/input-guard";
+import { OutputGuardrail } from "@/lib/guardrails/output-guard";
 
 export class AgentRuntime {
   private systemPrompt: string;
@@ -16,6 +18,8 @@ export class AgentRuntime {
   private executor: Executor;
   private reflector: Reflector;
   private tracer: Tracer;
+  private inputGuard: InputGuardrail;
+  private outputGuard: OutputGuardrail;
 
   constructor(systemPrompt: string) {
     this.systemPrompt = systemPrompt;
@@ -24,6 +28,8 @@ export class AgentRuntime {
     this.executor = new Executor(createToolRegistry());
     this.reflector = new Reflector();
     this.tracer = new Tracer();
+    this.inputGuard = new InputGuardrail();
+    this.outputGuard = new OutputGuardrail();
   }
 
   async run(
@@ -40,6 +46,18 @@ export class AgentRuntime {
     ];
 
     const lastUserMsg = userMessages[userMessages.length - 1];
+    const userInput = (lastUserMsg?.content as string) || "";
+
+    const inputCheck = await this.inputGuard.check(userInput);
+    if (!inputCheck.passed) {
+      return new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(inputCheck.reason ?? "输入被拒绝"));
+          controller.close();
+        },
+      });
+    }
+
     if (lastUserMsg?.content) {
       this.memory.save("user", lastUserMsg.content as string);
     }
@@ -47,9 +65,7 @@ export class AgentRuntime {
     this.tracer.startTrace("agent-run");
 
     const plannerSpan = this.tracer.startSpan("planner");
-    const plan = await this.planner.createPlan(
-      (lastUserMsg?.content as string) || "",
-    );
+    const plan = await this.planner.createPlan(userInput);
     this.tracer.endSpan(plannerSpan, true);
 
     console.log("========== PLAN ==========");
@@ -111,6 +127,16 @@ export class AgentRuntime {
           step = nextStep(plan);
 
           if (!step) {
+            const outputCheck = await this.outputGuard.check(fullText);
+            if (!outputCheck.passed) {
+              return new ReadableStream({
+                start(controller) {
+                  controller.enqueue(new TextEncoder().encode(outputCheck.reason ?? "输出被拒绝"));
+                  controller.close();
+                },
+              });
+            }
+
             const answerSpan = this.tracer.startSpan("answer");
             this.tracer.endSpan(answerSpan, true);
             this.tracer.endTrace();
