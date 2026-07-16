@@ -1,16 +1,11 @@
-# AgentBootcamp
+# AgentBootcamp — A Production-oriented Agent Runtime
 
 100 天 AI Agent 工程训练项目——从零构建生产级 Agent Runtime。
 
 ## Architecture
 
 ```
-User → Runtime → Planner → Workflow → Executor → Reflector
-                  │           │
-                  ▼           ▼
-               Memory     StateMachine
-                              │
-                          Checkpoint
+User → Runtime → Planner → Workflow → Executor → Tool → Observation → Evaluation
 ```
 
 ## Features

@@ -1,4 +1,4 @@
-import { Evaluation } from "./types";
+import { Evaluation } from "@/lib/core/types/execution";
 
 export class Reflector {
   evaluate(responseText: string): Evaluation {

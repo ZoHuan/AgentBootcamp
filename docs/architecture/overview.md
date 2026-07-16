@@ -1,50 +1,76 @@
 # Architecture Overview
 
-## Agent Runtime v0.1.0
+## Agent Runtime v0.2.0
 
 ```
-User Request
-    │
-    ▼
-AgentRuntime (调度中心)
-    │
-    ├── Planner      → 制定多步骤计划
-    ├── Workflow     → 节点路由 + 条件分支
-    ├── Executor     → 调用 LLM + 执行工具
-    ├── Reflector    → 评估结果 + 触发重试
-    ├── Memory       → 上下文管理
-    └── StateMachine → 生命周期管理
-         │
-         ▼
-    Checkpoint       → 执行快照 + 崩溃恢复
+User → Guard → Runtime → Planner → Workflow → Executor → Tool
+                  │          │           │          │
+                  ▼          ▼           ▼          ▼
+               Trace    Policy       Approval    Recovery
+                  │                      │
+                  ▼                      ▼
+            Observation            Evaluation
+```
+
+## 分层架构
+
+```
+core            ← 基础类型 + 错误 + 上下文
+  ↑
+runtime         ← 编排调度（AgentRuntime）
+  ↑
+workflow        ← 流程引擎
+  ↑
+tools           ← 工具体系
 ```
 
 ## 核心模块
 
-### Planner（lib/runtime/planner.ts）
-将用户意图分解为可执行的 Plan（Goal + Steps）。
+### Core（lib/core/）
+- `types/agent.ts` — AgentState + ExecutionContext
+- `types/tool.ts` — Tool + ToolResult
+- `types/workflow.ts` — Plan / PlanStep / WorkflowState / nextStep
+- `types/execution.ts` — Evaluation + Metrics
+- `errors/errors.ts` — AgentError / ToolError / PlannerError
+- `context.ts` — createContext 工厂
 
-### Workflow Engine（lib/workflow/）
-节点路由 + 条件分支。`next(state)` 根据执行结果决定下一步。
+### Runtime（lib/runtime/）
+编排调度中心：Guard → Trace → Plan → Execute → Reflect → Retry → Output Guard → Answer
 
-### Executor（lib/runtime/executor.ts）
-LLM 通信层。`askLLM()` 调用 LLM + 工具，`respond()` 流式返回。
+### Planning（lib/planning/）
+LLM Planner：Prompt → LLM → JSON → validate → Plan
 
-### Reflector（lib/runtime/reflector.ts）
-评估执行结果。检测错误关键词，决定重试（最多 2 次）。
+### Workflow（lib/workflow/）
+WorkflowEngine：节点路由 + 条件分支 + 审批暂停
 
-### Memory（lib/memory/）
-上下文管理。`save/load/clear/formatHistory()`，限制 10 条。
+### Tools（lib/tools/）
+Tool Registry + KeywordRouter + 评分路由
 
-### State Machine（lib/state/）
-生命周期：IDLE → PLANNING → EXECUTING → REFLECTING → COMPLETED。
+### Evaluation（lib/evaluation/）
+evaluate / evaluateAll + Metrics + Report
 
-### Checkpoint（lib/state/checkpoint.ts）
-执行快照。每步成功后保存，崩溃后自动恢复。
+### Recovery（lib/recovery/）
+RetryManager（指数退避）+ ErrorHandler（错误分类）
+
+### Approval（lib/approval/）
+ApprovalManager：requestApproval / approve / reject + RiskLevel
+
+### Guardrails（lib/guardrails/）
+InputGuard / ToolGuard / OutputGuard + GuardrailManager
+
+### Observability（lib/observability/）
+Tracer + Trace + Span + Timeline + Exporter
+
+### Policy（lib/policy/）
+PolicyEngine + RiskPolicy
+
+### Services（lib/services/llm/）
+LLMClient 抽象（chat / stream），预留 OpenAI/Claude/Gemini 适配
 
 ## 设计思想
 
 - 职责分离：每模块只做一件事
-- 可观测：StateMachine + Checkpoint 提供完整追踪
-- 可恢复：Checkpoint 支持断点续跑
-- 可扩展：加 Tool 不改 Runtime，加 State 不改 Engine
+- 依赖单向：core ← runtime ← workflow ← tools
+- 可观测：Trace + Span 覆盖全流程
+- 可恢复：Checkpoint + Retry 双重保障
+- 可扩展：加 Tool 不改 Runtime，加 Policy 不改 Guard

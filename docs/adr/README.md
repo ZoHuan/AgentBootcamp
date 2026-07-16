@@ -16,3 +16,4 @@
 - [ADR-0014](ADR-0014-human-in-the-loop.md) — Human-in-the-Loop
 - [ADR-0015](ADR-0015-observability.md) — Observability
 - [ADR-0016](ADR-0016-guardrails.md) — Guardrails
+- [ADR-0017](ADR-0017-runtime-refactor.md) — Runtime Refactor

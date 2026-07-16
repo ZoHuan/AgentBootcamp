@@ -3,8 +3,7 @@ import { MemoryManager } from "@/lib/memory/memory";
 import { LLMPlanner } from "@/lib/planning/planner";
 import { Executor } from "./executor";
 import { Reflector } from "./reflector";
-import { nextStep } from "./plan";
-import { PlanStep } from "@/lib/planning/plan";
+import { nextStep, Plan, PlanStep } from "@/lib/core/types/workflow";
 
 import { createToolRegistry } from "@/lib/tools";
 import { Tracer } from "@/lib/observability/tracer";
@@ -48,6 +47,7 @@ export class AgentRuntime {
     const lastUserMsg = userMessages[userMessages.length - 1];
     const userInput = (lastUserMsg?.content as string) || "";
 
+    // ① Guard: 输入检查
     const inputCheck = await this.inputGuard.check(userInput);
     if (!inputCheck.passed) {
       return new ReadableStream({
@@ -62,7 +62,10 @@ export class AgentRuntime {
       this.memory.save("user", lastUserMsg.content as string);
     }
 
+    // ② Trace: 开始追踪
     this.tracer.startTrace("agent-run");
+
+    // ③ Plan: LLM 生成执行计划
 
     const plannerSpan = this.tracer.startSpan("planner");
     const plan = await this.planner.createPlan(userInput);
